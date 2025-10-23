@@ -1,5 +1,19 @@
+# Ignore all
+*
+
+# Unignore all with extensions
+!*.*
+
+# Unignore all dirs
+!*/
+
 # Prerequisites
 *.d
+
+# Compiled binaries
+*.exe
+*.out
+*.bin
 
 # Object files
 *.o
