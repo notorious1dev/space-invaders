@@ -2,172 +2,233 @@
 #include <stdbool.h>
 #include <math.h>
 #include <stdlib.h>
-#define DEBUG 1
 
-//Screen Settings
+typedef struct {
+    Vector2 Position;
+    Vector2 Velocity;
+    bool isActive;
+} Object;
+
+typedef enum {
+    GAME_PLAYING,
+    GAME_DEAD_SCREEN,
+} GameState;
+
+GameState currentGameState = GAME_PLAYING;
+
+// Screen Settings
 const int width = 600;
 const int height = 800;
 float dt = 0;
-Color background_color = (Color){0,0,10,255};
+Color background_color = (Color){0, 0, 10, 255};
 
-typedef struct{
-	Vector2 Position;
-	Vector2 Velocity;
-	bool isActive;	
-} Object;
+// Player Statistics
+int points = 0;
+int health = 3;
 
-//Player Configuration
+// Player Configuration
+#define PLAYER_RADIUS 50
 float player_speed = 500.0f;
 
-//Bullets Configuration
+// Bullets Configuration
 #define BULLETS_AMOUNT 10
+#define BULLETS_RADIUS 15
 #define FIRE_COOLDOWN_STANDART_VALUE 0.75f
-#define BULLET_SPAWN_Y_OFFSET - 30
+#define BULLET_SPAWN_Y_OFFSET -30
 #define BULLET_SPEED 20.0f
 float fire_cooldown = 0;
 Object bullets[BULLETS_AMOUNT] = {0};
 
-//Enemies Configuration
-#define ENEMIES_AMOUNT 15
+// Enemies Configuration
+#define ENEMIES_AMOUNT 7
 #define ENEMIES_SPEED 10.0f
-#define ENEMIES_SPAWN_Y_OFFSET
+#define ENEMY_RADIUS 25
 Object enemies[ENEMIES_AMOUNT] = {0};
 
+// --- Utility Functions ---
 float vector2_magnitude(Vector2 *vector) {
-	return sqrt((vector->x*vector->x) + (vector->y*vector->y));
+    return sqrtf((vector->x * vector->x) + (vector->y * vector->y));
 }
 
 void vector2_normalize(Vector2 *vector) {
-	float magnitude = vector2_magnitude(vector);
-	vector->x /= magnitude;
-	vector->y /= magnitude;
+    float magnitude = vector2_magnitude(vector);
+    vector->x /= magnitude;
+    vector->y /= magnitude;
 }
 
-Vector2 ReadPlayerMovementInput(){
-	Vector2 input = {0,0};
+Vector2 ReadPlayerMovementInput() {
+    Vector2 input = {0, 0};
 
-	if(IsKeyDown(KEY_LEFT)) input.x += -1;
-	if(IsKeyDown(KEY_RIGHT)) input.x += 1;
+    if (IsKeyDown(KEY_LEFT)) input.x += -1;
+    if (IsKeyDown(KEY_RIGHT)) input.x += 1;
 
-	return input;
-}
-
-void Start()
-{
-	InitWindow(width, height, "Space-Invaders");
-	SetTargetFPS(60);
+    return input;
 }
 
 Vector2 GetEnemySpawnVector() {
-	int yMax = -50;
-	int yMin = -800;
+    int yMax = -50;
+    int yMin = -800;
+    int random_y = yMin + rand() % (yMax - yMin + 1);
 
-	int random_y = yMin + rand() % (yMax - yMin + 1);
+    int xMax = width - 50;
+    int xMin = 50;
+    int random_x = xMin + rand() % (xMax - xMin + 1);
 
-	int xMax = width - 50;
-	int xMin = 50;
-	int random_x = xMin + rand() % (xMax - xMin + 1);
+    return (Vector2){(float)random_x, (float)random_y};
+}
 
-	return (Vector2){(float)random_x, (float)random_y};
+bool CheckCircleCollision(Vector2 Circle1Center, float Circle1Radius,
+                          Vector2 Circle2Center, float Circle2Radius) {
+    float distance = sqrtf(powf((Circle2Center.x - Circle1Center.x), 2) +
+                           powf((Circle2Center.y - Circle1Center.y), 2));
+    return (distance <= Circle2Radius + Circle1Radius);
+}
+
+void Start() {
+    InitWindow(width, height, "Space-Invaders");
+    SetTargetFPS(60);
 }
 
 int main() {
-	Start();
-	
-	Object player = {
-		.Position = (Vector2){width/2, height/1.2},
-		.Velocity = (Vector2){0, 0},
-		.isActive = true
-	};
+    Start();
 
-	//Bullets initialization
-	for (int i = 0; i < BULLETS_AMOUNT; i ++){
-		bullets[i] = (Object){.Position = {0,0}, .Velocity = {0,0}, .isActive = false};
-	}
+    Object player = {
+        .Position = (Vector2){width / 2, height / 1.2f},
+        .Velocity = (Vector2){0, 0},
+        .isActive = true
+    };
 
-	//Enemies initialization
-	for (int i = 0; i < ENEMIES_AMOUNT; i++){
-		Vector2 enemy_spawn_position = GetEnemySpawnVector();
-		enemies[i] = (Object){.Position = enemy_spawn_position, .Velocity = {0,ENEMIES_SPEED}, .isActive = true};
-	}
+    // Bullets initialization
+    for (int i = 0; i < BULLETS_AMOUNT; i++) {
+        bullets[i] = (Object){.Position = {0, 0}, .Velocity = {0, 0}, .isActive = false};
+    }
 
-	while(!WindowShouldClose())
-	{
-		dt = GetFrameTime();
+    // Enemies initialization
+    for (int i = 0; i < ENEMIES_AMOUNT; i++) {
+        Vector2 enemy_spawn_position = GetEnemySpawnVector();
+        enemies[i] = (Object){.Position = enemy_spawn_position, .Velocity = {0, ENEMIES_SPEED}, .isActive = true};
+    }
 
-		//Update
-		player.Velocity = ReadPlayerMovementInput();
-		player.Position.x += player.Velocity.x * player_speed * dt;
+    while (!WindowShouldClose()) {
+        dt = GetFrameTime();
 
-		//CheckPlayerBoundaries
-		if (player.Position.x <= 50)
-			player.Position.x = 50;
+        // Game State switch
+        if (health <= 0)
+            currentGameState = GAME_DEAD_SCREEN;
+        else
+            currentGameState = GAME_PLAYING;
 
-		if (player.Position.x >= 550)
-			player.Position.x = 550;	
+        switch (currentGameState) {
+            case GAME_PLAYING:
+                // Player Movement
+                player.Velocity = ReadPlayerMovementInput();
+                player.Position.x += player.Velocity.x * player_speed * dt;
 
-		//BulletShoot(Arrow_UP)
-		fire_cooldown -= dt;
-		if (IsKeyDown(KEY_UP) && fire_cooldown <= 0){
-			for (int i = 0; i < BULLETS_AMOUNT; i++)
-			{
-				if (!bullets[i].isActive)
-				{
-					bullets[i].Position.x = player.Position.x; 
-					bullets[i].Position.y = player.Position.y + BULLET_SPAWN_Y_OFFSET;
-					bullets[i].Velocity = (Vector2){0, - BULLET_SPEED};
-					bullets[i].isActive = true;
-					fire_cooldown = FIRE_COOLDOWN_STANDART_VALUE;
-					break;
-				}
-			}
-		}
+                // Boundaries
+                if (player.Position.x <= 50) player.Position.x = 50;
+                if (player.Position.x >= 550) player.Position.x = 550;
 
-		//BulletUpdate
-		for (int i = 0; i < BULLETS_AMOUNT; i++) {
-            		if (!bullets[i].isActive) continue;
+                // Shooting
+                fire_cooldown -= dt;
+                if (IsKeyDown(KEY_UP) && fire_cooldown <= 0) {
+                    for (int i = 0; i < BULLETS_AMOUNT; i++) {
+                        if (!bullets[i].isActive) {
+                            bullets[i].Position.x = player.Position.x;
+                            bullets[i].Position.y = player.Position.y + BULLET_SPAWN_Y_OFFSET;
+                            bullets[i].Velocity = (Vector2){0, -BULLET_SPEED};
+                            bullets[i].isActive = true;
+                            fire_cooldown = FIRE_COOLDOWN_STANDART_VALUE;
+                            break;
+                        }
+                    }
+                }
 
-            		bullets[i].Position.x += bullets[i].Velocity.x * BULLET_SPEED * dt;
-            		bullets[i].Position.y += bullets[i].Velocity.y * BULLET_SPEED * dt;
+                // Bullet Update
+                for (int i = 0; i < BULLETS_AMOUNT; i++) {
+                    if (!bullets[i].isActive) continue;
+                    bullets[i].Position.x += bullets[i].Velocity.x * BULLET_SPEED * dt;
+                    bullets[i].Position.y += bullets[i].Velocity.y * BULLET_SPEED * dt;
+                    if (bullets[i].Position.y < 0)
+                        bullets[i].isActive = false;
+                }
 
-            		if (bullets[i].Position.y < 0)
-                	bullets[i].isActive = false;
-		}
+                // Enemies Update
+                for (int i = 0; i < ENEMIES_AMOUNT; i++) {
+                    if (!enemies[i].isActive) {
+                        enemies[i].Position = GetEnemySpawnVector();
+                        enemies[i].isActive = true;
+                    }
 
-		//EnemiesUpdate
-		for (int i = 0; i < ENEMIES_AMOUNT; i++){
-			if (!enemies[i].isActive) {
-				enemies[i].Position = GetEnemySpawnVector();
-				enemies[i].isActive = true;
-			}
+                    enemies[i].Position.y += enemies[i].Velocity.y * ENEMIES_SPEED * dt;
 
-			enemies[i].Position.x += enemies[i].Velocity.x * ENEMIES_SPEED * dt;
-			enemies[i].Position.y += enemies[i].Velocity.y * ENEMIES_SPEED * dt;
+                    if (enemies[i].Position.y >= 850) {
+                        enemies[i].isActive = false;
+                        health -= 1;
+                    }
+                }
 
-			if (enemies[i].Position.y >= 850)
-				enemies[i].isActive = false;
-		}
+                // Bullet Collision
+                for (int bi = 0; bi < BULLETS_AMOUNT; bi++) {
+                    if (!bullets[bi].isActive) continue;
+                    for (int ei = 0; ei < ENEMIES_AMOUNT; ei++) {
+                        if (CheckCircleCollision(bullets[bi].Position, BULLETS_RADIUS,
+                                                 enemies[ei].Position, ENEMY_RADIUS)) {
+                            bullets[bi].isActive = false;
+                            enemies[ei].isActive = false;
+                            points += 1;
+                            break;
+                        }
+                    }
+                }
+                break;
 
-		//Drawing
-	BeginDrawing();
-		//Draw Bullets
-		for (int i = 0; i < BULLETS_AMOUNT; i++){
-			if (!bullets[i].isActive) continue;
-			
-			DrawCircle(bullets[i].Position.x, bullets[i].Position.y, 15, RED);
-		}
+            case GAME_DEAD_SCREEN:
+                if (IsKeyPressed(KEY_UP)) {
+                    health = 3;
+                    points = 0;
+                    for (int i = 0; i < ENEMIES_AMOUNT; i++)
+                        enemies[i].isActive = false;
+                    currentGameState = GAME_PLAYING;
+                }
+                break;
+        }
 
-		//Draw Enemies
-		for (int i = 0; i < ENEMIES_AMOUNT; i++){
-			if (!enemies[i].isActive) continue;
-			DrawCircle(enemies[i].Position.x, enemies[i].Position.y, 25, YELLOW);
-		}
+        // DRAWING SECTION
+        BeginDrawing();
+        ClearBackground(background_color);
 
-		DrawCircle(player.Position.x, player.Position.y, 50, WHITE);
-		ClearBackground(background_color);
-	EndDrawing();
-	}
+        switch (currentGameState) {
+            case GAME_DEAD_SCREEN:
+                DrawText("YOU ARE DEAD", 180, 200, 30, RED);
+		DrawText(TextFormat("Highest score: %d", points), 180, 250, 20, GRAY);
+                DrawText("Press UP to restart", 180, 300, 20, GRAY);
+                break;
 
-	CloseWindow();
-	return 0;
+            case GAME_PLAYING:
+                // Draw bullets
+                for (int i = 0; i < BULLETS_AMOUNT; i++) {
+                    if (!bullets[i].isActive) continue;
+                    DrawCircle(bullets[i].Position.x, bullets[i].Position.y, BULLETS_RADIUS, RED);
+                }
+
+                // Draw enemies
+                for (int i = 0; i < ENEMIES_AMOUNT; i++) {
+                    if (!enemies[i].isActive) continue;
+                    DrawCircle(enemies[i].Position.x, enemies[i].Position.y, ENEMY_RADIUS, YELLOW);
+                }
+
+                // Draw player
+                DrawCircle(player.Position.x, player.Position.y, PLAYER_RADIUS, WHITE);
+
+                // Draw stats
+                DrawText(TextFormat("Score: %d", points), 50, 80, 20, WHITE);
+                DrawText(TextFormat("Health: %d", health), 50, 120, 20, WHITE);
+                break;
+        }
+
+        EndDrawing();
+    }
+
+    CloseWindow();
+    return 0;
 }
