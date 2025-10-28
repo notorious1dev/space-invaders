@@ -4,6 +4,8 @@
 #include <stdlib.h>
 #include "utilities.h"
 
+#define DEBUG 1
+
 typedef struct {
     Vector2 Position;
     Vector2 Velocity;
@@ -31,10 +33,15 @@ int health = 3;
 #define PLAYER_RADIUS 50
 float player_speed = 500.0f;
 
+//Gameplay Configuration
+float hardness_multiplier = 1.0f;
+int last_ten_points = 0;
+float delta = 0;
+
 // Bullets Configuration
 #define BULLETS_AMOUNT 10
 #define BULLETS_RADIUS 15
-#define FIRE_COOLDOWN_STANDART_VALUE 0.75f
+#define FIRE_COOLDOWN_STANDART_VALUE 0.45f
 #define BULLET_SPAWN_Y_OFFSET -30
 #define BULLET_SPEED 20.0f
 float fire_cooldown = 0;
@@ -54,7 +61,7 @@ void Start() {
 int main() {
     Start();
 
-    Object player = {
+ Object player = {
         .Position = (Vector2){width / 2, height / 1.2f},
         .Velocity = (Vector2){0, 0},
         .isActive = true
@@ -71,6 +78,7 @@ int main() {
         enemies[i] = (Object){.Position = enemy_spawn_position, .Velocity = {0, ENEMIES_SPEED}, .isActive = true};
     }
 
+   
     while (!WindowShouldClose()) {
         dt = GetFrameTime();
 
@@ -84,7 +92,7 @@ int main() {
             case GAME_PLAYING:
                 // Player Movement
                 player.Velocity = ReadPlayerMovementInput();
-                player.Position.x += player.Velocity.x * player_speed * dt;
+                player.Position.x += player.Velocity.x * player_speed * dt * hardness_multiplier;
 
                 // Boundaries
                 if (player.Position.x <= 50) player.Position.x = 50;
@@ -108,8 +116,8 @@ int main() {
                 // Bullet Update
                 for (int i = 0; i < BULLETS_AMOUNT; i++) {
                     if (!bullets[i].isActive) continue;
-                    bullets[i].Position.x += bullets[i].Velocity.x * BULLET_SPEED * dt;
-                    bullets[i].Position.y += bullets[i].Velocity.y * BULLET_SPEED * dt;
+                    bullets[i].Position.x += bullets[i].Velocity.x * BULLET_SPEED * dt * hardness_multiplier;
+                    bullets[i].Position.y += bullets[i].Velocity.y * BULLET_SPEED * dt * hardness_multiplier;
                     if (bullets[i].Position.y < 0)
                         bullets[i].isActive = false;
                 }
@@ -121,7 +129,7 @@ int main() {
                         enemies[i].isActive = true;
                     }
 
-                    enemies[i].Position.y += enemies[i].Velocity.y * ENEMIES_SPEED * dt;
+                    enemies[i].Position.y += enemies[i].Velocity.y * ENEMIES_SPEED * dt * hardness_multiplier;
 
                     if (enemies[i].Position.y >= 850) {
                         enemies[i].isActive = false;
@@ -142,15 +150,23 @@ int main() {
                         }
                     }
                 }
+
+		//Hardness multiplier
+		if (points - last_ten_points >= 10) {
+			hardness_multiplier += 0.1;
+			last_ten_points = points;
+		}
+
                 break;
 
             case GAME_DEAD_SCREEN:
                 if (IsKeyPressed(KEY_UP)) {
-                    health = 3;
-                    points = 0;
-                    for (int i = 0; i < ENEMIES_AMOUNT; i++)
-                        enemies[i].isActive = false;
-                    currentGameState = GAME_PLAYING;
+                health = 3;
+        	points = 0;
+		hardness_multiplier = 1;
+                for (int i = 0; i < ENEMIES_AMOUNT; i++)
+                	enemies[i].isActive = false;
+                currentGameState = GAME_PLAYING;
                 }
                 break;
         }
@@ -167,6 +183,11 @@ int main() {
                 break;
 
             case GAME_PLAYING:
+
+		#ifdef DEBUG
+		DrawText(TextFormat("Debug mode", hardness_multiplier), 50, 40, 20, YELLOW);	
+                DrawText(TextFormat("Hardess: %.2f", hardness_multiplier), 50, 160, 20, YELLOW);
+		#endif
                 // Draw bullets
                 for (int i = 0; i < BULLETS_AMOUNT; i++) {
                     if (!bullets[i].isActive) continue;
