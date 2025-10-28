@@ -2,6 +2,7 @@
 #include <stdbool.h>
 #include <math.h>
 #include <stdlib.h>
+#include "utilities.h"
 
 typedef struct {
     Vector2 Position;
@@ -45,45 +46,6 @@ Object bullets[BULLETS_AMOUNT] = {0};
 #define ENEMY_RADIUS 25
 Object enemies[ENEMIES_AMOUNT] = {0};
 
-// --- Utility Functions ---
-float vector2_magnitude(Vector2 *vector) {
-    return sqrtf((vector->x * vector->x) + (vector->y * vector->y));
-}
-
-void vector2_normalize(Vector2 *vector) {
-    float magnitude = vector2_magnitude(vector);
-    vector->x /= magnitude;
-    vector->y /= magnitude;
-}
-
-Vector2 ReadPlayerMovementInput() {
-    Vector2 input = {0, 0};
-
-    if (IsKeyDown(KEY_LEFT)) input.x += -1;
-    if (IsKeyDown(KEY_RIGHT)) input.x += 1;
-
-    return input;
-}
-
-Vector2 GetEnemySpawnVector() {
-    int yMax = -50;
-    int yMin = -800;
-    int random_y = yMin + rand() % (yMax - yMin + 1);
-
-    int xMax = width - 50;
-    int xMin = 50;
-    int random_x = xMin + rand() % (xMax - xMin + 1);
-
-    return (Vector2){(float)random_x, (float)random_y};
-}
-
-bool CheckCircleCollision(Vector2 Circle1Center, float Circle1Radius,
-                          Vector2 Circle2Center, float Circle2Radius) {
-    float distance = sqrtf(powf((Circle2Center.x - Circle1Center.x), 2) +
-                           powf((Circle2Center.y - Circle1Center.y), 2));
-    return (distance <= Circle2Radius + Circle1Radius);
-}
-
 void Start() {
     InitWindow(width, height, "Space-Invaders");
     SetTargetFPS(60);
@@ -105,7 +67,7 @@ int main() {
 
     // Enemies initialization
     for (int i = 0; i < ENEMIES_AMOUNT; i++) {
-        Vector2 enemy_spawn_position = GetEnemySpawnVector();
+        Vector2 enemy_spawn_position = GetEnemySpawnVector(height, width);
         enemies[i] = (Object){.Position = enemy_spawn_position, .Velocity = {0, ENEMIES_SPEED}, .isActive = true};
     }
 
@@ -155,7 +117,7 @@ int main() {
                 // Enemies Update
                 for (int i = 0; i < ENEMIES_AMOUNT; i++) {
                     if (!enemies[i].isActive) {
-                        enemies[i].Position = GetEnemySpawnVector();
+                        enemies[i].Position = GetEnemySpawnVector(height, width);
                         enemies[i].isActive = true;
                     }
 

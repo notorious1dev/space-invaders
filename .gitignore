@@ -1,11 +1,5 @@
-# Ignore all
-*
-
-# Unignore all with extensions
-!*.*
-
-# Unignore all dirs
-!*/
+#igone main
+main
 
 # Prerequisites
 *.d
@@ -14,6 +8,10 @@
 *.exe
 *.out
 *.bin
+
+# libraries
+*.a
+!lib/libraylib.a
 
 # Object files
 *.o
@@ -29,18 +27,6 @@
 # Precompiled Headers
 *.gch
 *.pch
-
-# Libraries
-*.lib
-*.a
-*.la
-*.lo
-
-# Shared objects (inc. Windows DLLs)
-*.dll
-*.so
-*.so.*
-*.dylib
 
 # Executables
 *.exe
