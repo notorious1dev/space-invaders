@@ -33,7 +33,7 @@ int health = 3;
 #define PLAYER_RADIUS 50
 float player_speed = 500.0f;
 
-//Gameplay Configuration
+// Gameplay Configuration
 float hardness_multiplier = 1.0f;
 int last_ten_points = 0;
 float delta = 0;
@@ -61,7 +61,7 @@ void Start() {
 int main() {
     Start();
 
- Object player = {
+    Object player = {
         .Position = (Vector2){width / 2, height / 1.2f},
         .Velocity = (Vector2){0, 0},
         .isActive = true
@@ -78,7 +78,6 @@ int main() {
         enemies[i] = (Object){.Position = enemy_spawn_position, .Velocity = {0, ENEMIES_SPEED}, .isActive = true};
     }
 
-   
     while (!WindowShouldClose()) {
         dt = GetFrameTime();
 
@@ -151,22 +150,22 @@ int main() {
                     }
                 }
 
-		//Hardness multiplier
-		if (points - last_ten_points >= 10) {
-			hardness_multiplier += 0.1;
-			last_ten_points = points;
-		}
+                // Hardness multiplier
+                if (points - last_ten_points >= 10) {
+                    hardness_multiplier += 0.1;
+                    last_ten_points = points;
+                }
 
                 break;
 
             case GAME_DEAD_SCREEN:
                 if (IsKeyPressed(KEY_UP)) {
-                health = 3;
-        	points = 0;
-		hardness_multiplier = 1;
-                for (int i = 0; i < ENEMIES_AMOUNT; i++)
-                	enemies[i].isActive = false;
-                currentGameState = GAME_PLAYING;
+                    health = 3;
+                    points = 0;
+                    hardness_multiplier = 1;
+                    for (int i = 0; i < ENEMIES_AMOUNT; i++)
+                        enemies[i].isActive = false;
+                    currentGameState = GAME_PLAYING;
                 }
                 break;
         }
@@ -178,16 +177,17 @@ int main() {
         switch (currentGameState) {
             case GAME_DEAD_SCREEN:
                 DrawText("YOU ARE DEAD", 180, 200, 30, RED);
-		DrawText(TextFormat("Highest score: %d", points), 180, 250, 20, GRAY);
+                DrawText(TextFormat("Highest score: %d", points), 180, 250, 20, GRAY);
                 DrawText("Press UP to restart", 180, 300, 20, GRAY);
                 break;
 
             case GAME_PLAYING:
 
-		#ifdef DEBUG
-		DrawText(TextFormat("Debug mode", hardness_multiplier), 50, 40, 20, YELLOW);	
+                #ifdef DEBUG
+                DrawText(TextFormat("Debug mode", hardness_multiplier), 50, 40, 20, YELLOW);    
                 DrawText(TextFormat("Hardess: %.2f", hardness_multiplier), 50, 160, 20, YELLOW);
-		#endif
+                #endif
+
                 // Draw bullets
                 for (int i = 0; i < BULLETS_AMOUNT; i++) {
                     if (!bullets[i].isActive) continue;
