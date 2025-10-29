@@ -91,7 +91,7 @@ int main() {
             case GAME_PLAYING:
                 // Player Movement
                 player.Velocity = ReadPlayerMovementInput();
-                player.Position.x += player.Velocity.x * player_speed * dt * hardness_multiplier;
+                player.Position.x += player.Velocity.x * player_speed * dt;
 
                 // Boundaries
                 if (player.Position.x <= 50) player.Position.x = 50;
@@ -163,6 +163,8 @@ int main() {
                     health = 3;
                     points = 0;
                     hardness_multiplier = 1;
+		    last_ten_points = 0;
+
                     for (int i = 0; i < ENEMIES_AMOUNT; i++)
                         enemies[i].isActive = false;
                     currentGameState = GAME_PLAYING;
