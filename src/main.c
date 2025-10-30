@@ -3,7 +3,7 @@
 #include <math.h>
 #include <stdlib.h>
 #include "utilities.h"
-
+#include <stdio.h>
 #define DEBUG 1
 
 typedef struct {
@@ -40,7 +40,7 @@ float delta = 0;
 
 // Bullets Configuration
 #define BULLETS_AMOUNT 10
-#define BULLETS_RADIUS 15
+#define BULLETS_RADIUS 10
 #define FIRE_COOLDOWN_STANDART_VALUE 0.45f
 #define BULLET_SPAWN_Y_OFFSET -30
 #define BULLET_SPEED 20.0f
@@ -53,13 +53,99 @@ Object bullets[BULLETS_AMOUNT] = {0};
 #define ENEMY_RADIUS 25
 Object enemies[ENEMIES_AMOUNT] = {0};
 
+//-----------GRAPHICS---------------//
+Texture2D background_texture = {0};
+
+Texture2D player_texture = {0};
+#define PLAYER_TEXTURE_SCALE 0.75
+
+Texture2D alien_texture = {0};
+#define ALIEN_TEXTURE_SCALE 0.5
+
 void Start() {
     InitWindow(width, height, "Space-Invaders");
+	InitAudioDevice();
     SetTargetFPS(60);
 }
 
+void GraphicsLoad() {
+	background_texture = LoadTexture("./assets/background.png");
+	if (background_texture.id == 0) {
+		TraceLog(LOG_ERROR, "Failed to load background_texture");
+	}
+
+	player_texture = LoadTexture("./assets/player_ship.png");
+	if (player_texture.id == 0) {
+		TraceLog(LOG_ERROR, "Failed to load player_texture");
+	}
+
+	alien_texture = LoadTexture("./assets/alien_ship.png");
+	if (alien_texture.id == 0) {
+		TraceLog(LOG_ERROR, "Failed to load aliens_texture");
+	}
+}
+
+void GraphicsFreeMemory() {
+	UnloadTexture(background_texture);
+	UnloadTexture(player_texture);
+	UnloadTexture(alien_texture);
+}
+
+//-----------SOUND---------------//
+#define FIRE_SOUNDS_AMOUNT 4
+Sound fireshots[FIRE_SOUNDS_AMOUNT] = {0};
+
+#define ALIEN_DEATH_AMOUNT 7
+Sound alien_death[ALIEN_DEATH_AMOUNT] = {0};
+
+Sound game_over = {0};
+
+void SoundsLoad() {
+	char filename[128] = {0};
+	
+	//Load shoot sound
+	for (int i = 0; i < FIRE_SOUNDS_AMOUNT; i++) {
+		sprintf(filename, "./assets/sounds/fire%d.wav", i + 1);
+		fireshots[i] = LoadSound(filename);
+
+		if (fireshots[i].frameCount == 0)
+			TraceLog(LOG_ERROR, "Failed to load sound: %s", filename);
+	}
+
+	//Load aliens death sounds
+	for (int i = 0; i < ALIEN_DEATH_AMOUNT; i++) {
+		sprintf(filename, "./assets/sounds/explosion_%d.wav", i + 1);
+		alien_death[i] = LoadSound(filename);
+
+		if (fireshots[i].frameCount == 0)
+			TraceLog(LOG_ERROR, "Failed to load sound: %s", filename);
+	}
+
+	//Load gameover sounds
+	game_over = LoadSound("./assets/sounds/game_over.wav");
+
+}
+
+void SoundsFreeMemory() {
+	//Unload fire sounds
+	for(int i = 0; i < FIRE_SOUNDS_AMOUNT; i++){
+		UnloadSound(fireshots[i]);
+	}
+
+	//Unload alien death sounds
+	for(int i = 0; i < ALIEN_DEATH_AMOUNT; i++){
+		UnloadSound(alien_death[i]);
+	}
+
+	//Unload gameover sound
+	UnloadSound(game_over);
+}
+
+
 int main() {
     Start();
+	GraphicsLoad();
+	SoundsLoad();
 
     Object player = {
         .Position = (Vector2){width / 2, height / 1.2f},
@@ -80,7 +166,6 @@ int main() {
 
     while (!WindowShouldClose()) {
         dt = GetFrameTime();
-
         // Game State switch
         if (health <= 0)
             currentGameState = GAME_DEAD_SCREEN;
@@ -107,7 +192,9 @@ int main() {
                             bullets[i].Velocity = (Vector2){0, -BULLET_SPEED};
                             bullets[i].isActive = true;
                             fire_cooldown = FIRE_COOLDOWN_STANDART_VALUE;
-                            break;
+
+							PlaySound(fireshots[RandomValueInRange(FIRE_SOUNDS_AMOUNT - 1, 0)]);
+							break;
                         }
                     }
                 }
@@ -126,7 +213,7 @@ int main() {
                     if (!enemies[i].isActive) {
                         enemies[i].Position = GetEnemySpawnVector(height, width);
                         enemies[i].isActive = true;
-                    }
+	 				}
 
                     enemies[i].Position.y += enemies[i].Velocity.y * ENEMIES_SPEED * dt * hardness_multiplier;
 
@@ -145,6 +232,8 @@ int main() {
                             bullets[bi].isActive = false;
                             enemies[ei].isActive = false;
                             points += 1;
+
+							PlaySound(alien_death[RandomValueInRange(ALIEN_DEATH_AMOUNT - 1, 0)]);
                             break;
                         }
                     }
@@ -174,7 +263,8 @@ int main() {
 
         // DRAWING SECTION
         BeginDrawing();
-        ClearBackground(background_color);
+		ClearBackground(background_color);
+        DrawTexture(background_texture, 0, 0, WHITE);
 
         switch (currentGameState) {
             case GAME_DEAD_SCREEN:
@@ -185,12 +275,7 @@ int main() {
 
             case GAME_PLAYING:
 
-                #ifdef DEBUG
-                DrawText(TextFormat("Debug mode", hardness_multiplier), 50, 40, 20, YELLOW);    
-                DrawText(TextFormat("Hardess: %.2f", hardness_multiplier), 50, 160, 20, YELLOW);
-                #endif
-
-                // Draw bullets
+                               // Draw bullets
                 for (int i = 0; i < BULLETS_AMOUNT; i++) {
                     if (!bullets[i].isActive) continue;
                     DrawCircle(bullets[i].Position.x, bullets[i].Position.y, BULLETS_RADIUS, RED);
@@ -198,22 +283,38 @@ int main() {
 
                 // Draw enemies
                 for (int i = 0; i < ENEMIES_AMOUNT; i++) {
-                    if (!enemies[i].isActive) continue;
-                    DrawCircle(enemies[i].Position.x, enemies[i].Position.y, ENEMY_RADIUS, YELLOW);
+                if (!enemies[i].isActive) continue;
+				Vector2 alien_drawing_position = (Vector2){enemies[i].Position.x - alien_texture.width / 2 * (float)ALIEN_TEXTURE_SCALE,
+															enemies[i].Position.y - alien_texture.height / 2 * (float)ALIEN_TEXTURE_SCALE};
+				DrawTextureEx(alien_texture, alien_drawing_position, 1, ALIEN_TEXTURE_SCALE, WHITE);
+
                 }
 
                 // Draw player
-                DrawCircle(player.Position.x, player.Position.y, PLAYER_RADIUS, WHITE);
+				Vector2 player_drawing_position = (Vector2){player.Position.x - player_texture.width / 2 * (float)PLAYER_TEXTURE_SCALE,
+															player.Position.y - player_texture.height / 2 * (float)PLAYER_TEXTURE_SCALE};
+				DrawTextureEx(player_texture, player_drawing_position, 1, PLAYER_TEXTURE_SCALE, WHITE);
 
-                // Draw stats
-                DrawText(TextFormat("Score: %d", points), 50, 80, 20, WHITE);
-                DrawText(TextFormat("Health: %d", health), 50, 120, 20, WHITE);
+				//Draw Statistics
+
+				#ifdef DEBUG
+                DrawText(TextFormat("Debug mode"), 50, 140, 20, YELLOW);    
+                DrawText(TextFormat("Hardess: %.2f", hardness_multiplier), 50, 160, 20, YELLOW);
+                DrawText(TextFormat("Fire CD: %.2f", fire_cooldown), 50, 180, 20, YELLOW);
+
+                #endif
+                DrawText(TextFormat("Score: %d", points), 50, 60, 20, WHITE);
+                DrawText(TextFormat("Health: %d", health), 50, 100, 20, WHITE);
                 break;
         }
 
         EndDrawing();
     }
 
+    GraphicsFreeMemory();
+	CloseAudioDevice();
+	SoundsFreeMemory();
     CloseWindow();
-    return 0;
+	
+	return 0;
 }

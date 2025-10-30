@@ -3,6 +3,10 @@
 #include <math.h>
 #include <stdlib.h>
 
+int RandomValueInRange(int max, int min) {
+	return min + rand() % (max - min + 1);
+}
+
 float vector2_magnitude(Vector2 *vector) {
     return sqrtf((vector->x * vector->x) + (vector->y * vector->y));
 }
@@ -23,14 +27,8 @@ Vector2 ReadPlayerMovementInput() {
 }
 
 Vector2 GetEnemySpawnVector(int height, int width) {
-    int yMax = -50;
-    int yMin = -800;
-    int random_y = yMin + rand() % (yMax - yMin + 1);
-
-    int xMax = width - 50;
-    int xMin = 50;
-    int random_x = xMin + rand() % (xMax - xMin + 1);
-
+    int random_y = RandomValueInRange(-50, -800);
+    int random_x = RandomValueInRange(width - 50, 50);
     return (Vector2){(float)random_x, (float)random_y};
 }
 
@@ -40,4 +38,6 @@ bool CheckCircleCollision(Vector2 Circle1Center, float Circle1Radius,
                            powf((Circle2Center.y - Circle1Center.y), 2));
     return (distance <= Circle2Radius + Circle1Radius);
 }
+
+
 

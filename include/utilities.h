@@ -7,6 +7,8 @@
 #include <stdlib.h>
 
 // --- Utility Functions ---
+int RandomValueInRange(int max, int min);
+
 float vector2_magnitude(Vector2 *vector);
 void vector2_normalize(Vector2 *vector);
 
