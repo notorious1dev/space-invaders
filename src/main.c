@@ -4,13 +4,23 @@
 #include <stdlib.h>
 #include "utilities.h"
 #include <stdio.h>
+
 #define DEBUG 1
 
+//---------------- STRUCTS ----------------//
 typedef struct {
     Vector2 Position;
     Vector2 Velocity;
     bool isActive;
 } Object;
+
+typedef struct {
+	Rectangle frame;
+	float time_per_frame;
+	float current_time;
+	int max_frame;
+	int currect_frame;
+} AnimatedSprite;
 
 typedef enum {
     GAME_PLAYING,
@@ -18,6 +28,11 @@ typedef enum {
 } GameState;
 
 GameState currentGameState = GAME_PLAYING;
+
+//---------------- GLOBAL DEFINITIONS ----------------//
+
+// Explosion Settings
+#define EXPLOSIONS_AMOUNT 10
 
 // Screen Settings
 const int width = 600;
@@ -36,7 +51,6 @@ float player_speed = 500.0f;
 // Gameplay Configuration
 float hardness_multiplier = 1.0f;
 int last_ten_points = 0;
-float delta = 0;
 
 // Bullets Configuration
 #define BULLETS_AMOUNT 10
@@ -50,114 +64,50 @@ Object bullets[BULLETS_AMOUNT] = {0};
 // Enemies Configuration
 #define ENEMIES_AMOUNT 7
 #define ENEMIES_SPEED 10.0f
-#define ENEMY_RADIUS 25
+#define ENEMY_RADIUS 25 
 Object enemies[ENEMIES_AMOUNT] = {0};
 
-//-----------GRAPHICS---------------//
+//----------- GRAPHICS ---------------//
 Texture2D background_texture = {0};
-
 Texture2D player_texture = {0};
 #define PLAYER_TEXTURE_SCALE 0.75
-
 Texture2D alien_texture = {0};
 #define ALIEN_TEXTURE_SCALE 0.6
+Texture2D fire_bullet_texture = {0};
 
-Texture2D fire_bullet = {0};
 
-void GraphicsLoad() {
-	background_texture = LoadTexture("./assets/background.png");
-	if (background_texture.id == 0) {
-		TraceLog(LOG_ERROR, "Failed to load background_texture");
-	}
+// Animated sprites
+#define EXPLOSIONS_SHEET_LENGHT 7
+AnimatedSprite *explosions;
 
-	player_texture = LoadTexture("./assets/player_ship.png");
-	if (player_texture.id == 0) {
-		TraceLog(LOG_ERROR, "Failed to load player_texture");
-	}
-
-	alien_texture = LoadTexture("./assets/alien_ship.png");
-	if (alien_texture.id == 0) {
-		TraceLog(LOG_ERROR, "Failed to load aliens_texture");
-	}
-
-	fire_bullet = LoadTexture("./assets/bullet.png");
-	if (fire_bullet.id == 0) {
-		TraceLog(LOG_ERROR, "Failed to load fule_bullet");
-	}
-
-}
-
-void GraphicsFreeMemory() {
-	UnloadTexture(background_texture);
-	UnloadTexture(player_texture);
-	UnloadTexture(alien_texture);
-}
-
-//-----------SOUND---------------//
+//----------- SOUND ---------------//
 #define FIRE_SOUNDS_AMOUNT 4
 Sound fireshots[FIRE_SOUNDS_AMOUNT] = {0};
 
 #define ALIEN_DEATH_AMOUNT 7
 Sound alien_death[ALIEN_DEATH_AMOUNT] = {0};
 
-bool mustplay_gameover = true;
+bool mustplay_gameover = true; // sound of death must be played only once
 Sound game_over = {0};
 
-void SoundsLoad() {
-	char filename[128] = {0};
-	
-	//Load shoot sound
-	for (int i = 0; i < FIRE_SOUNDS_AMOUNT; i++) {
-		sprintf(filename, "./assets/sounds/fire%d.wav", i + 1);
-		fireshots[i] = LoadSound(filename);
+// ---------------- FUNCTION DECLARATIONS ----------------
+void ProperExit();
+void GraphicsLoad();
+void GraphicsFreeMemory();
+void SoundsLoad();
+void SoundsFreeMemory();
+void Start();
+//---------------- MAIN ----------------//
 
-		if (fireshots[i].frameCount == 0)
-			TraceLog(LOG_ERROR, "Failed to load sound: %s", filename);
-	}
-
-	//Load aliens death sounds
-	for (int i = 0; i < ALIEN_DEATH_AMOUNT; i++) {
-		sprintf(filename, "./assets/sounds/explosion_%d.wav", i + 1);
-		alien_death[i] = LoadSound(filename);
-
-		if (fireshots[i].frameCount == 0)
-			TraceLog(LOG_ERROR, "Failed to load sound: %s", filename);
-	}
-
-	//Load gameover sounds
-	game_over = LoadSound("./assets/sounds/game_over.wav");
-
-}
-
-void SoundsFreeMemory() {
-	//Unload fire sounds
-	for(int i = 0; i < FIRE_SOUNDS_AMOUNT; i++){
-		UnloadSound(fireshots[i]);
-	}
-
-	//Unload alien death sounds
-	for(int i = 0; i < ALIEN_DEATH_AMOUNT; i++){
-		UnloadSound(alien_death[i]);
-	}
-
-	//Unload gameover sound
-	UnloadSound(game_over);
-}
-
-void Start() {
-    InitWindow(width, height, "Space-Invaders");
-	InitAudioDevice();
-    SetTargetFPS(144);
-}
-
-int main() {
+int main()
+{
     Start();
 	GraphicsLoad();
 	SoundsLoad();
 
     Object player = {
-        .Position = (Vector2){width / 2, height / 1.2f},
-        .Velocity = (Vector2){0, 0},
+        .Position = {width / 2, height / 1.2f},
+        .Velocity = {0, 0},
         .isActive = true
     };
 
@@ -172,7 +122,10 @@ int main() {
         enemies[i] = (Object){.Position = enemy_spawn_position, .Velocity = {0, ENEMIES_SPEED}, .isActive = true};
     }
 
-    while (!WindowShouldClose()) {
+	//Explosions initialization
+
+	while (!WindowShouldClose()) 
+	{
         dt = GetFrameTime();
 
         // Game State switch
@@ -231,8 +184,7 @@ int main() {
                         health -= 1;
                     }
                 }
-
-                // Bullet Collision
+                // Bullet Collision:
                 for (int bi = 0; bi < BULLETS_AMOUNT; bi++) {
                     if (!bullets[bi].isActive) continue;
                     for (int ei = 0; ei < ENEMIES_AMOUNT; ei++) {
@@ -241,7 +193,6 @@ int main() {
                             bullets[bi].isActive = false;
                             enemies[ei].isActive = false;
                             points += 1;
-
 							PlaySound(alien_death[RandomValueInRange(ALIEN_DEATH_AMOUNT - 1, 0)]);
                             break;
                         }
@@ -253,13 +204,10 @@ int main() {
                     hardness_multiplier += 0.1;
                     last_ten_points = points;
                 }
-
                 break;
 
             case GAME_DEAD_SCREEN:
-
-				if (mustplay_gameover)
-				{
+				if (mustplay_gameover) {
 					PlaySound(game_over);
 					mustplay_gameover = false;
 				}
@@ -291,53 +239,158 @@ int main() {
                 break;
 
 			case GAME_PLAYING:
-
                 // Draw bullets
                 for (int i = 0; i < BULLETS_AMOUNT; i++) {
                 	if (!bullets[i].isActive) continue;					
-					Vector2 bullet_drawing_position = (Vector2){bullets[i].Position.x - fire_bullet.width / 2 * (float)(BULLETS_RADIUS + (i * 5))/100.0f,
-														bullets[i].Position.y - fire_bullet.height / 2 * (float)(BULLETS_RADIUS + (i * 5))/100.0f};
-
-					DrawTextureEx(fire_bullet, bullet_drawing_position, 0.0f, BULLETS_RADIUS/100.0f, WHITE);	
+					Vector2 bullet_drawing_position = {
+						bullets[i].Position.x - fire_bullet_texture.width / 2 * (float)(BULLETS_RADIUS + (i * 5)) / 100.0f,
+						bullets[i].Position.y - fire_bullet_texture.height / 2 * (float)(BULLETS_RADIUS + (i * 5)) / 100.0f
+					};
+					DrawTextureEx(fire_bullet_texture, bullet_drawing_position, 0.0f, BULLETS_RADIUS / 100.0f, WHITE);	
 				}
 
                 // Draw enemies
                 for (int i = 0; i < ENEMIES_AMOUNT; i++) {
-                if (!enemies[i].isActive) continue;
-				Vector2 alien_drawing_position = (Vector2){enemies[i].Position.x - alien_texture.width / 2 * (float)ALIEN_TEXTURE_SCALE,
-															enemies[i].Position.y - alien_texture.height / 2 * (float)ALIEN_TEXTURE_SCALE};
-				DrawTextureEx(alien_texture, alien_drawing_position, 0.0f, ALIEN_TEXTURE_SCALE, WHITE);
-
+					if (!enemies[i].isActive) continue;
+					Vector2 alien_drawing_position = {
+						enemies[i].Position.x - alien_texture.width / 2 * (float)ALIEN_TEXTURE_SCALE,
+						enemies[i].Position.y - alien_texture.height / 2 * (float)ALIEN_TEXTURE_SCALE
+					};
+					DrawTextureEx(alien_texture, alien_drawing_position, 0.0f, ALIEN_TEXTURE_SCALE, WHITE);
                 }
 
                 // Draw player
-				Vector2 player_drawing_position = (Vector2){player.Position.x - player_texture.width / 2 * (float)PLAYER_TEXTURE_SCALE,
-															player.Position.y - player_texture.height / 2 * (float)PLAYER_TEXTURE_SCALE};
+				Vector2 player_drawing_position = {
+					player.Position.x - player_texture.width / 2 * (float)PLAYER_TEXTURE_SCALE,
+					player.Position.y - player_texture.height / 2 * (float)PLAYER_TEXTURE_SCALE
+				};
 				DrawTextureEx(player_texture, player_drawing_position, 1, PLAYER_TEXTURE_SCALE, WHITE);
 
-				//Draw Statistics
-
+				// Stats
 				#ifdef DEBUG
-                DrawText(TextFormat("Debug mode"), 50, 140, 20, YELLOW);    
-                DrawText(TextFormat("Hardess: %.2f", hardness_multiplier), 50, 160, 20, YELLOW);
+                DrawText("Debug mode", 50, 140, 20, YELLOW);    
+                DrawText(TextFormat("Hardness: %.2f", hardness_multiplier), 50, 160, 20, YELLOW);
                 DrawText(TextFormat("Fire CD: %.2f", fire_cooldown), 50, 180, 20, YELLOW);
-				
-				Rectangle rect = {35, 45, 115, 85};
-				DrawRectangleRec(rect, (Color){255,255,255,50});
-
                 #endif
+
                 DrawText(TextFormat("Score: %d", points), 50, 60, 20, WHITE);
                 DrawText(TextFormat("Health: %d", health), 50, 100, 20, WHITE);
+				DrawRectangle(35, 45, 115, 85, (Color){255,255,255,50});
                 break;
         }
 
         EndDrawing();
     }
+	ProperExit();
+}
 
-    GraphicsFreeMemory();
-	CloseAudioDevice();
+// ---------------- FUNCTION IMPLEMENTATIONS ----------------
+
+void ProperExit() {
+	GraphicsFreeMemory();
 	SoundsFreeMemory();
+	CloseAudioDevice();
     CloseWindow();
+}
+
+void Start() {
+    InitWindow(width, height, "Space-Invaders");
+    InitAudioDevice();
 	
-	return 0;
+    explosions = (AnimatedSprite *)malloc(sizeof(AnimatedSprite) * EXPLOSIONS_SHEET_LENGHT);
+    if (explosions == NULL) {
+        TraceLog(LOG_ERROR, "malloc AnimatedSprites explosions");
+        exit(1);
+    }
+
+    SetTargetFPS(144);
+}
+
+void GraphicsLoad() {
+    background_texture = LoadTexture("./assets/background.png");
+    if (background_texture.id == 0){
+        TraceLog(LOG_ERROR, "Failed to load background_texture");
+		goto HandleGraphicsLoadingError;
+	}
+
+    player_texture = LoadTexture("./assets/player_ship.png");
+    if (player_texture.id == 0) {
+        TraceLog(LOG_ERROR, "Failed to load player_texture");
+		goto HandleGraphicsLoadingError;
+	}
+
+    alien_texture = LoadTexture("./assets/alien_ship.png");
+    if (alien_texture.id == 0){
+        TraceLog(LOG_ERROR, "Failed to load alien_texture");
+		goto HandleGraphicsLoadingError;
+	}
+
+    fire_bullet_texture = LoadTexture("./assets/bullet.png");
+    if (fire_bullet_texture.id == 0){
+        TraceLog(LOG_ERROR, "Failed to load fire_bullet_texture");
+		goto HandleGraphicsLoadingError;
+	}
+
+	return;
+
+	HandleGraphicsLoadingError:
+	ProperExit();
+	exit(1);
+}
+
+void GraphicsFreeMemory() {
+    UnloadTexture(background_texture);
+    UnloadTexture(player_texture);
+    UnloadTexture(alien_texture);
+    UnloadTexture(fire_bullet_texture);
+}
+
+void SoundsLoad() {
+    char filename[128] = {0};
+
+    // Load shoot sounds
+    for (int i = 0; i < FIRE_SOUNDS_AMOUNT; i++) {
+        sprintf(filename, "./assets/sounds/fire%d.wav", i + 1); 
+        fireshots[i] = LoadSound(filename);
+
+        if (fireshots[i].frameCount == 0){
+            TraceLog(LOG_ERROR, "Failed to load sound: %s", filename);
+			goto HandleSoundLoadingExit;
+		}
+    }
+
+    // Load alien death sounds
+    for (int i = 0; i < ALIEN_DEATH_AMOUNT; i++) {
+        sprintf(filename, "./assets/sounds/explosion_%d.wav", i + 1);
+        alien_death[i] = LoadSound(filename);
+
+        if (alien_death[i].frameCount == 0) {
+            TraceLog(LOG_ERROR, "Failed to load sound: %s", filename);
+			goto HandleSoundLoadingExit;
+		}
+    }
+
+    // Load game over sound
+    game_over = LoadSound("./assets/sounds/game_over.wav");
+
+	if (game_over.frameCount == 0){
+		TraceLog(LOG_ERROR, "Failed to load sound: ./assets/sounds/game_over.wav");
+		goto HandleSoundLoadingExit;
+	}
+
+	return;
+
+	HandleSoundLoadingExit:
+	ProperExit();
+	exit(1);
+}
+
+void SoundsFreeMemory() {
+    for (int i = 0; i < FIRE_SOUNDS_AMOUNT; i++)
+        UnloadSound(fireshots[i]);
+
+    for (int i = 0; i < ALIEN_DEATH_AMOUNT; i++)
+        UnloadSound(alien_death[i]);
+
+    UnloadSound(game_over);
 }
