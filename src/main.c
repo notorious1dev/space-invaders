@@ -40,7 +40,7 @@ float delta = 0;
 
 // Bullets Configuration
 #define BULLETS_AMOUNT 10
-#define BULLETS_RADIUS 10
+#define BULLETS_RADIUS 15
 #define FIRE_COOLDOWN_STANDART_VALUE 0.45f
 #define BULLET_SPAWN_Y_OFFSET -30
 #define BULLET_SPEED 20.0f
@@ -60,13 +60,9 @@ Texture2D player_texture = {0};
 #define PLAYER_TEXTURE_SCALE 0.75
 
 Texture2D alien_texture = {0};
-#define ALIEN_TEXTURE_SCALE 0.5
+#define ALIEN_TEXTURE_SCALE 0.6
 
-void Start() {
-    InitWindow(width, height, "Space-Invaders");
-	InitAudioDevice();
-    SetTargetFPS(60);
-}
+Texture2D fire_bullet = {0};
 
 void GraphicsLoad() {
 	background_texture = LoadTexture("./assets/background.png");
@@ -83,6 +79,12 @@ void GraphicsLoad() {
 	if (alien_texture.id == 0) {
 		TraceLog(LOG_ERROR, "Failed to load aliens_texture");
 	}
+
+	fire_bullet = LoadTexture("./assets/bullet.png");
+	if (fire_bullet.id == 0) {
+		TraceLog(LOG_ERROR, "Failed to load fule_bullet");
+	}
+
 }
 
 void GraphicsFreeMemory() {
@@ -141,6 +143,11 @@ void SoundsFreeMemory() {
 	UnloadSound(game_over);
 }
 
+void Start() {
+    InitWindow(width, height, "Space-Invaders");
+	InitAudioDevice();
+    SetTargetFPS(144);
+}
 
 int main() {
     Start();
@@ -275,10 +282,13 @@ int main() {
 
             case GAME_PLAYING:
 
-                               // Draw bullets
+                // Draw bullets
                 for (int i = 0; i < BULLETS_AMOUNT; i++) {
                     if (!bullets[i].isActive) continue;
-                    DrawCircle(bullets[i].Position.x, bullets[i].Position.y, BULLETS_RADIUS, RED);
+				Vector2 bullet_drawing_position = (Vector2){bullets[i].Position.x - fire_bullet.width / 2 * (float)BULLETS_RADIUS/100,
+															bullets[i].Position.y - fire_bullet.height / 2 * (float)BULLETS_RADIUS/100};
+
+				DrawTextureEx(fire_bullet, bullet_drawing_position, 0.0f, BULLETS_RADIUS/100.0f, WHITE);
                 }
 
                 // Draw enemies
@@ -286,7 +296,7 @@ int main() {
                 if (!enemies[i].isActive) continue;
 				Vector2 alien_drawing_position = (Vector2){enemies[i].Position.x - alien_texture.width / 2 * (float)ALIEN_TEXTURE_SCALE,
 															enemies[i].Position.y - alien_texture.height / 2 * (float)ALIEN_TEXTURE_SCALE};
-				DrawTextureEx(alien_texture, alien_drawing_position, 1, ALIEN_TEXTURE_SCALE, WHITE);
+				DrawTextureEx(alien_texture, alien_drawing_position, 0.0f, ALIEN_TEXTURE_SCALE, WHITE);
 
                 }
 
