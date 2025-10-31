@@ -9,19 +9,13 @@ You control a ship at the bottom of the screen and shoot at waves of alien invad
 ## Features
 - Moving enemies  
 - Simple controls: move left/right and shoot  
-- Minimalistic, retro-style graphics (currently, only circles spawn circles to destroy circles xD)  
+- Minimalistic, retro-style graphics 
 - Easy to build and run (Linux only)  
 
 ## Requirements
 - Linux  
 - C compiler (gcc)  
 - raylib included as a static library in the `lib` directory  
-
-## TODO
-- Replace placeholder graphics
-(circles) with proper sprites for player, enemies, and bullets  
-- Add sound effects for shooting, enemy hits, and game over
-- Add particles when an asteroid is destroyed
 
 ## Installation and Running
 ```bash
@@ -30,4 +24,5 @@ cd space-invaders
 ./start.sh
 ```
 ## Gameplay
-![Screencast from 2025-10-29 23-45-28](https://github.com/user-attachments/assets/09b883ab-c155-44e0-acc0-800033878451)
+![gameplay](https://github.com/user-attachments/assets/ee550619-e455-44be-a544-415c5b611a0a)
+
