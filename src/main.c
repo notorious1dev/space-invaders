@@ -100,6 +100,7 @@ Sound fireshots[FIRE_SOUNDS_AMOUNT] = {0};
 #define ALIEN_DEATH_AMOUNT 7
 Sound alien_death[ALIEN_DEATH_AMOUNT] = {0};
 
+bool mustplay_gameover = true;
 Sound game_over = {0};
 
 void SoundsLoad() {
@@ -173,6 +174,7 @@ int main() {
 
     while (!WindowShouldClose()) {
         dt = GetFrameTime();
+
         // Game State switch
         if (health <= 0)
             currentGameState = GAME_DEAD_SCREEN;
@@ -255,11 +257,19 @@ int main() {
                 break;
 
             case GAME_DEAD_SCREEN:
+
+				if (mustplay_gameover)
+				{
+					PlaySound(game_over);
+					mustplay_gameover = false;
+				}
+
                 if (IsKeyPressed(KEY_UP)) {
                     health = 3;
                     points = 0;
                     hardness_multiplier = 1;
-		    last_ten_points = 0;
+		    		last_ten_points = 0;
+					mustplay_gameover = true;
 
                     for (int i = 0; i < ENEMIES_AMOUNT; i++)
                         enemies[i].isActive = false;
@@ -280,16 +290,16 @@ int main() {
                 DrawText("Press UP to restart", 180, 300, 20, GRAY);
                 break;
 
-            case GAME_PLAYING:
+			case GAME_PLAYING:
 
                 // Draw bullets
                 for (int i = 0; i < BULLETS_AMOUNT; i++) {
-                    if (!bullets[i].isActive) continue;
-				Vector2 bullet_drawing_position = (Vector2){bullets[i].Position.x - fire_bullet.width / 2 * (float)BULLETS_RADIUS/100,
-															bullets[i].Position.y - fire_bullet.height / 2 * (float)BULLETS_RADIUS/100};
+                	if (!bullets[i].isActive) continue;					
+					Vector2 bullet_drawing_position = (Vector2){bullets[i].Position.x - fire_bullet.width / 2 * (float)(BULLETS_RADIUS + (i * 5))/100.0f,
+														bullets[i].Position.y - fire_bullet.height / 2 * (float)(BULLETS_RADIUS + (i * 5))/100.0f};
 
-				DrawTextureEx(fire_bullet, bullet_drawing_position, 0.0f, BULLETS_RADIUS/100.0f, WHITE);
-                }
+					DrawTextureEx(fire_bullet, bullet_drawing_position, 0.0f, BULLETS_RADIUS/100.0f, WHITE);	
+				}
 
                 // Draw enemies
                 for (int i = 0; i < ENEMIES_AMOUNT; i++) {
@@ -311,6 +321,9 @@ int main() {
                 DrawText(TextFormat("Debug mode"), 50, 140, 20, YELLOW);    
                 DrawText(TextFormat("Hardess: %.2f", hardness_multiplier), 50, 160, 20, YELLOW);
                 DrawText(TextFormat("Fire CD: %.2f", fire_cooldown), 50, 180, 20, YELLOW);
+				
+				Rectangle rect = {35, 45, 115, 85};
+				DrawRectangleRec(rect, (Color){255,255,255,50});
 
                 #endif
                 DrawText(TextFormat("Score: %d", points), 50, 60, 20, WHITE);
