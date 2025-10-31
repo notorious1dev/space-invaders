@@ -5,7 +5,7 @@
 #include "utilities.h"
 #include <stdio.h>
 
-#define DEBUG 1
+#define DEBUG 0
 
 //---------------- STRUCTS ----------------//
 typedef struct {
@@ -16,10 +16,10 @@ typedef struct {
 
 typedef struct {
 	Rectangle frame;
-	float time_per_frame;
 	float current_time;
-	int max_frame;
-	int currect_frame;
+	int current_frame;
+	bool isActive;
+	Vector2 spawnVector;
 } AnimatedSprite;
 
 typedef enum {
@@ -30,9 +30,6 @@ typedef enum {
 GameState currentGameState = GAME_PLAYING;
 
 //---------------- GLOBAL DEFINITIONS ----------------//
-
-// Explosion Settings
-#define EXPLOSIONS_AMOUNT 10
 
 // Screen Settings
 const int width = 600;
@@ -49,13 +46,14 @@ int health = 3;
 float player_speed = 500.0f;
 
 // Gameplay Configuration
+#define MAX_HARDNESS 2.1
 float hardness_multiplier = 1.0f;
-int last_ten_points = 0;
+int last_ten_points = 0; // temp which contains last (score % 10 = 0) value
 
 // Bullets Configuration
 #define BULLETS_AMOUNT 10
 #define BULLETS_RADIUS 15
-#define FIRE_COOLDOWN_STANDART_VALUE 0.45f
+#define FIRE_COOLDOWN_STANDART_VALUE 0.40f
 #define BULLET_SPAWN_Y_OFFSET -30
 #define BULLET_SPEED 20.0f
 float fire_cooldown = 0;
@@ -71,13 +69,20 @@ Object enemies[ENEMIES_AMOUNT] = {0};
 Texture2D background_texture = {0};
 Texture2D player_texture = {0};
 #define PLAYER_TEXTURE_SCALE 0.75
+
 Texture2D alien_texture = {0};
 #define ALIEN_TEXTURE_SCALE 0.6
+
 Texture2D fire_bullet_texture = {0};
+
+Texture2D explosion_sheet_texture = {0};
 
 
 // Animated sprites
 #define EXPLOSIONS_SHEET_LENGHT 7
+#define EXPLOSIONS_SPRITE_SIZE 128 //width and lenght of 1 sprite
+#define EXPLOSIONS_TIME_PER_FRAME 0.1f
+#define EXPLOSION_AMOUNT 10
 AnimatedSprite *explosions;
 
 //----------- SOUND ---------------//
@@ -123,6 +128,22 @@ int main()
     }
 
 	//Explosions initialization
+	
+	explosions = (AnimatedSprite *)malloc(sizeof(AnimatedSprite) * EXPLOSION_AMOUNT);
+    if (explosions == NULL) {
+        TraceLog(LOG_ERROR, "malloc AnimatedSprites explosions");
+        exit(1);
+    }
+
+	for (int i = 0; i < EXPLOSION_AMOUNT; i ++){
+		explosions[i] = (AnimatedSprite){
+			.frame = (Rectangle) {0,0,EXPLOSIONS_SPRITE_SIZE, EXPLOSIONS_SPRITE_SIZE},
+			.current_time = 0,
+			.current_frame = 0,
+			.isActive = false,
+			.spawnVector = (Vector2){0,0},
+		};
+	}
 
 	while (!WindowShouldClose()) 
 	{
@@ -143,7 +164,34 @@ int main()
                 // Boundaries
                 if (player.Position.x <= 50) player.Position.x = 50;
                 if (player.Position.x >= 550) player.Position.x = 550;
+				
+				// Explosions update
+				for (int i = 0; i < EXPLOSION_AMOUNT; i++)
+				{
+    			if (!explosions[i].isActive) continue;
 
+    			// Resed animation if it's the last frame
+    			if (explosions[i].current_frame == EXPLOSIONS_SHEET_LENGHT - 1 &&
+    			    explosions[i].current_time >= EXPLOSIONS_TIME_PER_FRAME)
+    			{
+    				explosions[i].frame = (Rectangle){0, 0, explosion_sheet_texture.height, explosion_sheet_texture.height};
+     				explosions[i].current_frame = 0;
+     				explosions[i].current_time = 0;
+      				explosions[i].isActive = false;
+      				continue;
+    			}
+
+   			 	// next frame
+    			if (explosions[i].current_time >= EXPLOSIONS_TIME_PER_FRAME)
+   			 	{
+      				explosions[i].frame.x += explosion_sheet_texture.height;
+        			explosions[i].current_frame += 1;
+        			explosions[i].current_time = 0;
+    			}
+
+   				explosions[i].current_time += dt;
+				}
+	
                 // Shooting
                 fire_cooldown -= dt;
                 if (IsKeyDown(KEY_UP) && fire_cooldown <= 0) {
@@ -194,13 +242,23 @@ int main()
                             enemies[ei].isActive = false;
                             points += 1;
 							PlaySound(alien_death[RandomValueInRange(ALIEN_DEATH_AMOUNT - 1, 0)]);
+
+							//Spawn explosion effect
+							for (int i = 0; i < EXPLOSION_AMOUNT; i ++)
+							{
+								if (explosions[i].isActive) continue;
+
+								explosions[i].spawnVector = enemies[ei].Position;
+								explosions[i].isActive = true;
+								break;
+							}
                             break;
                         }
                     }
                 }
 
                 // Hardness multiplier
-                if (points - last_ten_points >= 10) {
+                if (points - last_ten_points >= 10 && hardness_multiplier < MAX_HARDNESS) {
                     hardness_multiplier += 0.1;
                     last_ten_points = points;
                 }
@@ -249,7 +307,20 @@ int main()
 					DrawTextureEx(fire_bullet_texture, bullet_drawing_position, 0.0f, BULLETS_RADIUS / 100.0f, WHITE);	
 				}
 
-                // Draw enemies
+				//Draw explosion effect
+				for (int i = 0; i < EXPLOSION_AMOUNT; i++) {
+    				if (!explosions[i].isActive) continue;
+
+        				DrawTextureRec(
+        				explosion_sheet_texture,
+						explosions[i].frame,
+						(Vector2){explosions[i].spawnVector.x - explosions[i].frame.width / 2,
+                  				explosions[i].spawnVector.y - explosions[i].frame.height / 2},
+						WHITE);
+}
+
+
+				// Draw enemies
                 for (int i = 0; i < ENEMIES_AMOUNT; i++) {
 					if (!enemies[i].isActive) continue;
 					Vector2 alien_drawing_position = {
@@ -267,7 +338,7 @@ int main()
 				DrawTextureEx(player_texture, player_drawing_position, 1, PLAYER_TEXTURE_SCALE, WHITE);
 
 				// Stats
-				#ifdef DEBUG
+				#if DEBUG == 1
                 DrawText("Debug mode", 50, 140, 20, YELLOW);    
                 DrawText(TextFormat("Hardness: %.2f", hardness_multiplier), 50, 160, 20, YELLOW);
                 DrawText(TextFormat("Fire CD: %.2f", fire_cooldown), 50, 180, 20, YELLOW);
@@ -275,7 +346,8 @@ int main()
 
                 DrawText(TextFormat("Score: %d", points), 50, 60, 20, WHITE);
                 DrawText(TextFormat("Health: %d", health), 50, 100, 20, WHITE);
-				DrawRectangle(35, 45, 115, 85, (Color){255,255,255,50});
+				DrawText(TextFormat("Space-Invaders: github@notorious1dev"), 10, height - 30, 20, (Color){255,255,255,25});
+				DrawRectangle(35, 50, 135, 80, (Color){255,255,255,50});
                 break;
         }
 
@@ -291,18 +363,12 @@ void ProperExit() {
 	SoundsFreeMemory();
 	CloseAudioDevice();
     CloseWindow();
+	free(explosions);
 }
 
 void Start() {
     InitWindow(width, height, "Space-Invaders");
-    InitAudioDevice();
-	
-    explosions = (AnimatedSprite *)malloc(sizeof(AnimatedSprite) * EXPLOSIONS_SHEET_LENGHT);
-    if (explosions == NULL) {
-        TraceLog(LOG_ERROR, "malloc AnimatedSprites explosions");
-        exit(1);
-    }
-
+    InitAudioDevice(); 
     SetTargetFPS(144);
 }
 
@@ -331,6 +397,12 @@ void GraphicsLoad() {
 		goto HandleGraphicsLoadingError;
 	}
 
+	explosion_sheet_texture = LoadTexture("./assets/explosion.png");
+    if (explosion_sheet_texture.id == 0){
+        TraceLog(LOG_ERROR, "Failed to load explosion_sheet_texture");
+		goto HandleGraphicsLoadingError;
+	}
+
 	return;
 
 	HandleGraphicsLoadingError:
@@ -343,6 +415,7 @@ void GraphicsFreeMemory() {
     UnloadTexture(player_texture);
     UnloadTexture(alien_texture);
     UnloadTexture(fire_bullet_texture);
+	UnloadTexture(explosion_sheet_texture);
 }
 
 void SoundsLoad() {
